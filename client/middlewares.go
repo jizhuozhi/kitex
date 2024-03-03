@@ -117,6 +117,8 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 					// we may get an old picker that include all outdated instances which will cause connect always failed.
 					picker := lb.GetPicker()
 					ins := picker.Next(ctx, request)
+
+					start := time.Now()
 					if ins == nil {
 						err = kerrors.ErrNoMoreInstance.WithCause(fmt.Errorf("last error: %w", lastErr))
 					} else {
@@ -124,6 +126,10 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 						// TODO: generalize retry strategy
 						err = next(ctx, request, response)
 					}
+					if s, ok := ins.(internal.Stateful); ok {
+						s.Update(ctx, time.Since(start), err)
+					}
+
 					if r, ok := picker.(internal.Reusable); ok {
 						r.Recycle()
 					}
